@@ -1,0 +1,212 @@
+---
+title: "Topic_modeling"
+author: "Kai"
+date: "2022-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(topicmodels)
+library(ggplot2)
+library(dplyr)
+library(tidytext)
+
+```
+
+# Import IMDB data
+```{r}
+IMDB_Dataset <- read_csv("IMDB Dataset.csv")
+```
+
+```{r}
+IMDB_2col <- IMDB_Dataset
+# IMDB_2col$sentiment<-ifelse(IMDB_2col$sentiment=="positive",1,0)
+```
+
+
+```{r}
+library(dplyr)
+imdb_1col <- IMDB_2col[,-(2)]
+imdb_1000 <- imdb_1col[1:1000,]
+
+imdb_new <- imdb_1000 %>%
+  mutate(review_num = row_number())
+
+imdb_finl <- imdb_new %>%
+  unnest_tokens(word, review) %>%
+   group_by(review_num) %>%
+   count(word)
+
+colnames(imdb_finl) <- c("review_num", "word", "word_count")
+
+imdb_finl %>%
+  cast_dtm(review_num, word, word_count)
+
+```
+
+```{r}
+ap_lda <- LDA(imdb_nona, k = 7, control = list(seed = 1234))
+ap_lda
+```
+
+```{r}
+word_counts <- imdb_finl %>%
+  anti_join(stop_words) %>%
+  count(document, word, sort = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#titles <- c("On the Origin of Clockwork, Perpetual Motion Devices, and the Compass")
+
+library(gutenbergr)
+by_review <- IMDB_2col %>%  
+
+
+#books <- gutenberg_works(title %in% titles) %>%
+#  gutenberg_download(meta_fields = "title")
+```
+
+```{r}
+library(stringr)
+
+# divide into documents, each representing one chapter
+by_chapter <- books %>%
+  group_by(title) %>%
+  mutate(chapter = cumsum(str_detect(
+    text, regex("^chapter ", ignore_case = TRUE)
+  ))) %>%
+  ungroup() %>%
+  filter(chapter > 0) %>%
+  unite(document, title, chapter)
+
+# split into words
+by_chapter_word <- by_chapter %>%
+  unnest_tokens(word, text)
+
+# find document-word counts
+word_counts <- by_chapter_word %>%
+  anti_join(stop_words) %>%
+  count(document, word, sort = TRUE)
+
+word_counts
+```
+
+```{r}
+chapters_dtm <- word_counts %>%
+  cast_dtm(document, word, n)
+
+chapters_dtm
+#> <<DocumentTermMatrix (documents: 193, terms: 18215)>>
+#> Non-/sparse entries: 104721/3410774
+#> Sparsity           : 97%
+#> Maximal term length: 19
+#> Weighting          : term frequency (tf)
+```
+
+```{r}
+chapters_lda <- LDA(chapters_dtm, k = 4, control = list(seed = 1234))
+chapters_lda
+#> A LDA_VEM topic model with 4 topics.
+```
+
+```{r}
+chapter_topics <- tidy(chapters_lda, matrix = "beta")
+chapter_topics
+```
+
+```{r}
+top_terms <- chapter_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 5) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms
+
+```
+
+```{r}
+library(ggplot2)
+
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()
+```
+
+```{r}
+chapters_gamma <- tidy(chapters_lda, matrix = "gamma")
+chapters_gamma
+```
+
+```{r}
+chapters_gamma <- chapters_gamma %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE)
+
+chapters_gamma
+
+```
+
+```{r}
+# reorder titles in order of topic 1, topic 2, etc before plotting
+chapters_gamma %>%
+  mutate(title = reorder(title, gamma * topic)) %>%
+  ggplot(aes(factor(topic), gamma)) +
+  geom_boxplot() +
+  facet_wrap(~ title) +
+  labs(x = "topic", y = expression(gamma))
+```
+
+```{r}
+chapter_classifications <- chapters_gamma %>%
+  group_by(title, chapter) %>%
+  slice_max(gamma) %>%
+  ungroup()
+
+chapter_classifications
+```
+
+
+
+```{r}
+IMDB_2col$review <- as.character(IMDB_2col$review)
+IMDB_2col <- na.omit(IMDB_2col)
+
+ap_lda <- LDA(sentiment ~ ., k = 2, control = list(seed = 1234))
+IMDB_lda
+```
+
+
+
