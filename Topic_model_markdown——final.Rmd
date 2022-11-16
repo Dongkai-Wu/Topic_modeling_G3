@@ -16,6 +16,7 @@ library(tidyr)
 library(ldatuning)
 library(lda)
 library(tm)
+library(dplyr)
 ```
 
 # Import IMDB data
@@ -23,24 +24,30 @@ library(tm)
 IMDB_Dataset <- read_csv("IMDB Dataset.csv")
 ```
 
-
+#Data Cleaning
 ```{r}
-library(dplyr)
+#Delete the sentiment column.
 imdb_1col <- IMDB_Dataset[,-(2)]
+
+# Since the 50,000 dataset is too large to run, we decided to decrease the sample size and use only the first 5000 reviews. 
 imdb_5000 <- imdb_1col[1:5000,]
 
+#Give each review a number from 1 to 5000.
 imdb_new <- imdb_5000 %>%
   mutate(review_num = row_number())
 
+#Count the number of each words in each reviews.
 imdb_finl <- imdb_new %>%
   unnest_tokens(word, review) %>%
    group_by(review_num) %>%
    count(word)
 
+#Using the stop_words data to delete some common useless words.
 word_counts <- imdb_finl %>%
   anti_join(stop_words) %>%
   count(review_num, word, sort = TRUE)
 
+# Get rid of br and some high-frequency common words in each topics.
 word_counts <- word_counts %>%
   filter(word != 'br' & word != 'film' & word != 'films')
 fre_words <- c("1","2","3","4","5","6","7","8","9","10","film", "movie","character","time","watch",
@@ -52,23 +59,28 @@ fre_words <- c("1","2","3","4","5","6","7","8","9","10","film", "movie","charact
 
 word_counts <- word_counts[!grepl(paste(fre_words,collapse="|"),word_counts$`word`),]
 
+#Transform the data set to a format that can be fitted in the LDA function.
 imdb_dtm <- word_counts %>%
   cast_dtm(review_num, word, n)
 ```
 
 
 ```{r}
+#Create a 9-topic LDA model.
+#We tried different numbers of topic from 5 to 15, and we find the top selected words seems most convincing when k is 9.
 imdb_lda <- LDA(imdb_dtm, k = 9, control = list(seed = 1234))
 imdb_lda
 ```
 
 
 ```{r}
+#The beta shows the probability of that term being generated from that topic.
 imdb_topics <- tidy(imdb_lda, matrix = "beta")
 imdb_topics
 ```
 
 ```{r}
+#The same as the previous step, but arrange the data by topics. We picked the top 5 frequency words in each topic.
 top_terms <- imdb_topics %>%
   group_by(topic) %>%
   slice_max(beta, n = 5) %>% 
@@ -78,14 +90,16 @@ top_terms <- imdb_topics %>%
 top_terms
 ```
 
-
+#Data visualization
 ```{r}
+#Use slice_max() to find the 10 terms that are most common within each topic.
 imdb_top_terms <- imdb_topics %>%
   group_by(topic) %>%
   slice_max(beta, n =5) %>% 
   ungroup() %>%
   arrange(topic, -beta)
 
+#Use ggplot to make a graph of words that extracted from each topic.
 imdb_top_terms %>%
   mutate(term = reorder_within(term, beta, topic)) %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
@@ -93,6 +107,7 @@ imdb_top_terms %>%
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered()
 ```
+#From the graph above, we can consider them as the rough features of each topic. It indicates that the most frequent words in each topic has a significance difference. However we are not yet able to define what each topic is about. For example, topic 2 and topic 4 both showed a high frequency of word comedy. And from some words like "found" and "budget" are hard to tell the movie genre.
 
 ```{r}
 tmResult <- posterior(imdb_lda)
