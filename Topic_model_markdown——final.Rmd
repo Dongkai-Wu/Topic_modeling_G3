@@ -110,8 +110,9 @@ imdb_top_terms %>%
 #From the graph above, we can consider them as the rough features of each topic. It indicates that the most frequent words in each topic has a significance difference. However we are not yet able to define what each topic is about. For example, topic 2 and topic 4 both showed a high frequency of word comedy. And from some words like "found" and "budget" are hard to tell the movie genre.
 
 ```{r}
+# have a look a some of the results (posterior distributions)
 tmResult <- posterior(imdb_lda)
-
+# format of the resulting object
 theta <- tmResult$topics
 
 beta <- tmResult$terms
@@ -121,21 +122,26 @@ beta <- tmResult$terms
 top3termsPerTopic <- terms(imdb_lda, 3)
 topicNames <- apply(top3termsPerTopic, 2, paste, collapse=" ")
 topicNames
+#select top 3 words from each topic
 ```
 
 ```{r}
-
+# re-rank top topic terms for topic names
 topicNames <- apply(lda::top.topic.words(beta, 3, by.score = T), 2, paste, collapse = " ")
 
-
-topicProportions <- colSums(theta) / nDocs(imdb_dtm) 
-names(topicProportions) <- topicNames     
+# What are the most probable topics in the entire collection?
+topicProportions <- colSums(theta) / nDocs(imdb_dtm)  
+# mean probabilities over all paragraphs
+names(topicProportions) <- topicNames
+# assign the topic names we created before
 sort(topicProportions, decreasing = TRUE) 
+# show summed proportions in decreased order
 ```
 
 ```{r}
 soP <- sort(topicProportions, decreasing = TRUE)
 paste(round(soP, 5), ":", names(soP))
+#rank the proportions of the different topics
 ```
 
 ```{r}
@@ -143,6 +149,8 @@ countsOfPrimaryTopics <- rep(0, 9)
 names(countsOfPrimaryTopics) <- topicNames
 for (i in 1:nDocs(imdb_dtm)) {
   topicsPerDoc <- theta[i, ] 
+# select topic distribution for document i
+# get first element position from ordered list
 
   primaryTopic <- order(topicsPerDoc, decreasing = TRUE)[1] 
   countsOfPrimaryTopics[primaryTopic] <- countsOfPrimaryTopics[primaryTopic] + 1
@@ -160,19 +168,23 @@ ggplot(counts) +
   labs(x = "Topic features by top frequent words", y = "counts", title="Counts of topic features by top frequent words") +
   theme_minimal() +
   coord_flip()
-
+#Creat a bar chart of the number of reviews of each topic which is explained by top 3 words
 ```
 
+#The chart shows that horror themes were the most commented on some movies, followed by funny themes and popularity. Then there is the theme of education, the theme of detectives and robbers, the theme of science fiction and the theme of music. Least commented on the theme of war.Therefore, these data can be speculated that the feeling of horror and gore after watching the movie will make people more want to comment on the movie, followed by the joy and funny brought by the comedy.
 ```{r}
-
+# assign each document of topic with the top frequent words and assign film types to each review
 imdb_genres <- imdb_5000
 New_topicNames <- c('Sci-fi','Funny','War','Comedy','Documentary','musical','Family','Horror','Crime')
 for (i in 1:nDocs(imdb_dtm)) {
   max_index <- which.max(theta[i, ])[[1]] 
+# select topic distribution for document i
+# get first element position from ordered list
  
   imdb_genres$top_words[i] <- topicNames[max_index]
   imdb_genres$class[i] <- New_topicNames[max_index]
 }
+#"imdb_class" means that finally each comment was successfully classified into its own label category 
 ```
 
 
