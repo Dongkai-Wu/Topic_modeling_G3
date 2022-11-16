@@ -1,8 +1,10 @@
 ---
 title: "Topic_modeling"
-author: "Dongkai Wu, Xu Luo, Xinpeng Hua, yifeng Fan"
+author: "Dongkai Wu, Xu Luo, Xinpeng Hua, Yifeng Fan"
 date: "2022-11-15"
-output: html_document
+output: 
+  pdf_document: 
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
