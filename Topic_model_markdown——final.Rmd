@@ -94,3 +94,73 @@ imdb_top_terms %>%
   scale_y_reordered()
 ```
 
+```{r}
+tmResult <- posterior(imdb_lda)
+
+theta <- tmResult$topics
+
+beta <- tmResult$terms
+```
+
+```{r}
+top3termsPerTopic <- terms(imdb_lda, 3)
+topicNames <- apply(top3termsPerTopic, 2, paste, collapse=" ")
+topicNames
+```
+
+```{r}
+
+topicNames <- apply(lda::top.topic.words(beta, 3, by.score = T), 2, paste, collapse = " ")
+
+
+topicProportions <- colSums(theta) / nDocs(imdb_dtm) 
+names(topicProportions) <- topicNames     
+sort(topicProportions, decreasing = TRUE) 
+```
+
+```{r}
+soP <- sort(topicProportions, decreasing = TRUE)
+paste(round(soP, 5), ":", names(soP))
+```
+
+```{r}
+countsOfPrimaryTopics <- rep(0, 9)
+names(countsOfPrimaryTopics) <- topicNames
+for (i in 1:nDocs(imdb_dtm)) {
+  topicsPerDoc <- theta[i, ] 
+
+  primaryTopic <- order(topicsPerDoc, decreasing = TRUE)[1] 
+  countsOfPrimaryTopics[primaryTopic] <- countsOfPrimaryTopics[primaryTopic] + 1
+}
+```
+
+```{r}
+counts <- data.frame(names(countsOfPrimaryTopics),countsOfPrimaryTopics)
+counts <- counts %>% rename(class=names.countsOfPrimaryTopics., 
+                            count=countsOfPrimaryTopics) %>%
+  arrange(desc(count))
+ggplot(counts) +
+  aes(x = reorder(class,count), y = count) +
+  geom_col(fill = "#228B22") +
+  labs(x = "Topic features by top frequent words", y = "counts", title="Counts of topic features by top frequent words") +
+  theme_minimal() +
+  coord_flip()
+
+```
+
+```{r}
+
+imdb_genres <- imdb_5000
+New_topicNames <- c('Sci-fi','Funny','War','Comedy','Documentary','musical','Family','Horror','Crime')
+for (i in 1:nDocs(imdb_dtm)) {
+  max_index <- which.max(theta[i, ])[[1]] 
+ 
+  imdb_genres$top_words[i] <- topicNames[max_index]
+  imdb_genres$class[i] <- New_topicNames[max_index]
+}
+```
+
+
+```{r}
+write.csv(x = imdb_genres, file = "imdb_genres.csv")
+```
