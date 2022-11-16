@@ -1,0 +1,96 @@
+---
+title: "Topic_modeling"
+author: "Dongkai Wu, Xu Luo, Xinpeng Hua, yifeng Fan"
+date: "2022-11-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(topicmodels)
+library(ggplot2)
+library(dplyr)
+library(tidytext)
+library(tidyr)
+library(ldatuning)
+library(lda)
+library(tm)
+```
+
+# Import IMDB data
+```{r}
+IMDB_Dataset <- read_csv("IMDB Dataset.csv")
+```
+
+
+```{r}
+library(dplyr)
+imdb_1col <- IMDB_Dataset[,-(2)]
+imdb_5000 <- imdb_1col[1:5000,]
+
+imdb_new <- imdb_5000 %>%
+  mutate(review_num = row_number())
+
+imdb_finl <- imdb_new %>%
+  unnest_tokens(word, review) %>%
+   group_by(review_num) %>%
+   count(word)
+
+word_counts <- imdb_finl %>%
+  anti_join(stop_words) %>%
+  count(review_num, word, sort = TRUE)
+
+word_counts <- word_counts %>%
+  filter(word != 'br' & word != 'film' & word != 'films')
+fre_words <- c("1","2","3","4","5","6","7","8","9","10","film", "movie","character","time","watch",
+               "story","people","plot","play","scene","director","actor","actress","make","life",
+               "main","bad","worst","wrong","good","acting","series","cast","lot","real","top",
+               "world","perform","feel","role","stuff","screen","tv","dvd","role","worth","take",
+               "take","guy","excellent","fan","day","bit","script","set","hard","absolutely",
+               "completely","true","john","job","minutes","audience","line","pretty","read","love")
+
+word_counts <- word_counts[!grepl(paste(fre_words,collapse="|"),word_counts$`word`),]
+
+imdb_dtm <- word_counts %>%
+  cast_dtm(review_num, word, n)
+```
+
+
+```{r}
+imdb_lda <- LDA(imdb_dtm, k = 9, control = list(seed = 1234))
+imdb_lda
+```
+
+
+```{r}
+imdb_topics <- tidy(imdb_lda, matrix = "beta")
+imdb_topics
+```
+
+```{r}
+top_terms <- imdb_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 5) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms
+```
+
+
+```{r}
+imdb_top_terms <- imdb_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n =5) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+imdb_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()
+```
+
